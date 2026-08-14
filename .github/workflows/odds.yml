@@ -1,0 +1,36 @@
+name: collect-odds
+# 경주일(목~월) 낮 시간대에 배당을 자동 수집 → odds.js 갱신.
+# 사용자는 폰 앱에서 '최신 불러오기'만 누르면 반영됨. (수동 실행: Actions 탭 Run workflow)
+on:
+  schedule:
+    - cron: '*/30 1-11 * * 1,4,5,6,0'   # 10:00~20:00 KST, 월·목·금·토·일 30분마다
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect-odds
+  cancel-in-progress: false
+
+jobs:
+  odds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 배당 수집
+        run: python collect_odds.py
+      - name: 변경 시 커밋·푸시
+        run: |
+          git config user.name "odds-bot"
+          git config user.email "odds-bot@users.noreply.github.com"
+          git add odds.js
+          if git diff --cached --quiet; then
+            echo "배당 변화 없음 — 커밋 생략"
+          else
+            git commit -m "odds $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
